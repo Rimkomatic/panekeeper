@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TMUX_SESSIONS_DIR="$HOME/.project-sessions"
 NVIM_SESSIONS_DIR="$HOME/.local/state/nvim/sessions"
 
 RESURRECT_DIR="$CURRENT_DIR/helpers/scripts"
+
+TMUX_SESSIONS_DIR=$(tmux show-options -gqv @resurrect-dir 2>/dev/null)
+TMUX_SESSIONS_DIR="${TMUX_SESSIONS_DIR/#\~/$HOME}"
+TMUX_SESSIONS_DIR="${TMUX_SESSIONS_DIR:-$HOME/.project-sessions}"
+TMUX_SESSIONS_DIR="${TMUX_SESSIONS_DIR%/}"
 
 mkdir -p "$TMUX_SESSIONS_DIR" "$NVIM_SESSIONS_DIR"
 

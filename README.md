@@ -12,6 +12,7 @@ If you use Tmux and Neovim, you've probably encountered the same problem: Tmux c
 
 * Restore complete Tmux workspaces
 * Restore Neovim buffers, folds, and cursor positions
+* Git branch-aware Neovim sessions (automatically isolates state per branch)
 * Automatic background snapshots
 * Pane-aware Neovim session management
 * Project-based workspace organization
@@ -20,32 +21,6 @@ If you use Tmux and Neovim, you've probably encountered the same problem: Tmux c
 * Lightweight, decoupled architecture
 
 ---
-
-## Architecture
-
-Panekeeper consists of four independent components:
-
-### Tmux Engine
-
-A customized, headless implementation of `tmux-resurrect` that manages:
-
-* Sessions
-* Windows
-* Pane layouts
-* Working directories
-
-### Neovim Engine
-
-A Lua module built on top of `mini.sessions` that automatically snapshots:
-
-* Open buffers
-* Cursor locations
-* Window state
-* Folds
-
-Snapshots are updated whenever editing activity stops.
-
-### Bridge Layer
 
 When a project is loaded, Panekeeper:
 
@@ -69,8 +44,38 @@ This ensures that unexpected crashes, reboots, or terminal closures do not resul
 Clone Panekeeper into your configuration directory:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/panekeeper.git ~/.config/panekeeper
+git clone https://github.com/Rimkomatic/panekeeper.git 
+
 ```
+It is recomemded to extract the files in ~/.config/panekeeper
+
+### Directory Structure
+
+```text
+panekeeper/
+├── bin/
+│   ├── auto-save.sh
+│   ├── manage-project.sh
+│   └── helpers/
+├── neovim/
+│   └── panekeeper.lua
+├── gui_examples/
+├── fzf-launcher.sh
+└── README.md
+```
+
+
+
+## Requirements
+
+* Tmux
+* Neovim
+* fzf
+* bash
+
+Needed Neovim plugins
+
+* `echasnovski/mini.sessions`
 
 Make the scripts executable:
 
@@ -87,27 +92,27 @@ chmod +x ~/.config/panekeeper/fzf-launcher.sh
 Add the following to your `~/.tmux.conf`:
 
 ```tmux
-# Start the auto-save daemon (every 10 minutes)
-run-shell -b "~/.config/panekeeper/bin/auto-save.sh 10"
+set -g @resurrect-dir '~/.project-sessions/'
 
 # Save the current project manually
 bind-key W run-shell -b "~/.config/panekeeper/bin/manage-project.sh save '#S'"
 
-# Open the Panekeeper project manager
-bind-key P display-popup -E "~/.config/panekeeper/fzf-launcher.sh"
+# Start the auto-save daemon
+run-shell -b "~/.config/panekeeper/bin/auto-save.sh"
 
-# Optional status bar indicator
-# Add #{?@is_saving,󰒓 ,} to status-left or status-right
+```
+
+### status bar indicator
+
+```
+
+ #S #{?@is_saving,󰒓 ,}\
+
 ```
 
 ---
 
 ## 3. Configure Neovim
-
-### Requirements
-
-* Neovim
-* `echasnovski/mini.sessions`
 
 Install the Panekeeper Lua module:
 
@@ -120,6 +125,17 @@ Then add the following to your `init.lua`:
 
 ```lua
 require("panekeeper").setup()
+```
+
+## 4. Configure according to preference 
+
+We can set different time for the autosave function to run , by default it is 6.9 minutes (noice) and we can pass arguments in our `tmux.conf` file in order to get different run time.
+
+```
+# To run each 3 minutes 
+
+run-shell -b "~/.config/panekeeper/bin/auto-save.sh 3"
+
 ```
 
 ---
@@ -176,23 +192,6 @@ Prefix + W
 
 ---
 
-# Directory Structure
-
-```text
-panekeeper/
-├── bin/
-│   ├── auto-save.sh
-│   ├── manage-project.sh
-│   └── helpers/
-├── neovim/
-│   └── panekeeper.lua
-├── gui_examples/
-├── fzf-launcher.sh
-└── README.md
-```
-
----
-
 # GUI Launchers
 
 Example launcher configurations are included for:
@@ -202,21 +201,6 @@ Example launcher configurations are included for:
 * Fuzzel
 
 See the `gui_examples/` directory for setup instructions.
-
----
-
-# Dependencies
-
-### Required
-
-* Tmux
-* Neovim
-* fzf
-* bash
-
-### Neovim Plugins
-
-* `echasnovski/mini.sessions`
 
 ---
 
