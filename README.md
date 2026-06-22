@@ -100,12 +100,6 @@ bind-key P display-popup -E "~/.config/panekeeper/fzf-launcher.sh"
 # Add #{?@is_saving,󰒓 ,} to status-left or status-right
 ```
 
-Reload your Tmux configuration:
-
-```bash
-tmux source-file ~/.tmux.conf
-```
-
 ---
 
 ## 3. Configure Neovim
@@ -127,20 +121,6 @@ Then add the following to your `init.lua`:
 ```lua
 require("panekeeper").setup()
 ```
-
----
-
-# Usage
-
-Panekeeper includes an FZF-powered workspace manager accessible directly from Tmux.
-
-Open the launcher:
-
-```text
-Prefix + P
-```
-
-A floating project manager will appear.
 
 ---
 
