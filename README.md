@@ -110,6 +110,38 @@ run-shell -b "~/.config/panekeeper/bin/auto-save.sh"
 
 ```
 
+Example config
+
+```
+# ==========================================
+# Panekeeper Integration
+# ==========================================
+
+# 1. Start the background auto-save daemon (e.g., every 10 minutes)
+run-shell -b "~/.config/panekeeper/bin/auto-save.sh 10"
+
+# 2. Manual Save Shortcut (Prefix + W)
+# Passes '#S' so the background daemon knows exactly which session to save
+bind-key W run-shell -b "~/.config/panekeeper/bin/manage-project.sh save '#S'"
+
+# 3. Launch the FZF Project Manager (Prefix + P)
+# Opens the launcher in a clean, floating Tmux popup
+bind-key P display-popup -E "~/.config/panekeeper/fzf-launcher.sh"
+
+# ==========================================
+# Optional Settings
+# ==========================================
+
+# Change the default save location (Panekeeper defaults to ~/.project-sessions)
+# set -g @resurrect-dir '~/.custom-save-folder/'
+
+# Add a visual indicator to your status bar when an auto-save occurs.
+# Drop this variable into your existing status-left or status-right string:
+# #{?@is_saving,󰒓 ,}
+
+```
+
+
 ---
 
 ## 3. Configure Neovim
@@ -125,7 +157,39 @@ Then add the following to your `init.lua`:
 
 ```lua
 require("panekeeper").setup()
+
 ```
+
+Your mini session config should look like this 
+
+```
+return {
+    {
+        "echasnovski/mini.nvim",
+        version = false,
+
+        -- Ensure the plugin loads when Panekeeper sends the restore command
+        cmd = { "TmuxSessionLoad" },
+
+        config = function()
+            -- 1. Initialize mini.sessions
+            -- We disable auto-read/write because Panekeeper manages the state
+            require("mini.sessions").setup({
+                autoread = false,
+                autowrite = false,
+                directory = vim.fn.stdpath("state") .. "/sessions",
+                file = "",
+            })
+
+            -- 2. Initialize the Panekeeper bridge
+            require("panekeeper").setup()
+        end,
+    },
+}
+
+```
+
+
 
 ## 4. Configure according to preference 
 
