@@ -112,7 +112,7 @@ run-shell -b "~/.config/panekeeper/bin/auto-save.sh"
 
 Example config
 
-```
+``` tmux
 # ==========================================
 # Panekeeper Integration
 # ==========================================
@@ -162,7 +162,7 @@ require("panekeeper").setup()
 
 Your mini session config should look like this 
 
-```
+``` lua
 return {
     {
         "echasnovski/mini.nvim",
