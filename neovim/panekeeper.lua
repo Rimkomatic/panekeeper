@@ -3,23 +3,41 @@
 
 local M = {}
 
-local function get_tmux_session()
-    if vim.env.TMUX == nil then
+local function get_git_branch()
+    local branch = vim.fn.system(
+        "git rev-parse --abbrev-ref HEAD 2>/dev/null"
+    ):gsub("\n", "")
+
+    if vim.v.shell_error ~= 0 or branch == "" then
         return nil
     end
 
-    -- Grab the unique internal Tmux ID for this specific terminal environment
+    return branch:gsub("[^%w%-_]", "_")
+end
+
+local function get_tmux_session()
+    if not vim.env.TMUX then
+        return nil
+    end
+
     local pane_id = vim.env.TMUX_PANE
     if not pane_id then
         return nil
     end
 
-    -- Explicitly target (-t) this specific pane ID
-    local cmd = "tmux display-message -p -t '" .. pane_id .. "' '#S_#I_#P'"
+    local cmd =
+        "tmux display-message -p -t '" .. pane_id .. "' '#S_#I_#P'"
+
     local session = vim.fn.system(cmd):gsub("\n", "")
 
     if session == "" then
         return nil
+    end
+
+    local branch = get_git_branch()
+
+    if branch then
+        session = session .. "__" .. branch
     end
 
     return session

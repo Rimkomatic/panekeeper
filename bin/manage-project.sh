@@ -81,28 +81,33 @@ do_load() {
 }
 
 do_save() {
-    local TARGET_NAME="$1"
+    (
+        flock -n 200 || exit 0
 
-    if [ -z "$TARGET_NAME" ]; then
-        TARGET_NAME=$(tmux display-message -p '#S' 2>/dev/null | tr -d '\n')
-    fi
+        local TARGET_NAME="$1"
 
-    if [ -z "$TARGET_NAME" ]; then
-        return 1
-    fi
+        if [ -z "$TARGET_NAME" ]; then
+            TARGET_NAME=$(tmux display-message -p '#S' 2>/dev/null | tr -d '\n')
+        fi
 
-    local SESSIONS_DIR="$TMUX_SESSIONS_DIR"
-    local RESURRECT_SCRIPT="$RESURRECT_DIR/save.sh"
+        if [ -z "$TARGET_NAME" ]; then
+            return 1
+        fi
 
-    mkdir -p "$SESSIONS_DIR"
+        local SESSIONS_DIR="$TMUX_SESSIONS_DIR"
+        local RESURRECT_SCRIPT="$RESURRECT_DIR/save.sh"
 
-    tmux run-shell -t "$TARGET_NAME" "$RESURRECT_SCRIPT" >/dev/null 2>&1
-    
-    if [ -f "$SESSIONS_DIR/last" ] || [ -L "$SESSIONS_DIR/last" ]; then
-        cp -L "$SESSIONS_DIR/last" "$SESSIONS_DIR/${TARGET_NAME}.txt"
-        ln -sf "$SESSIONS_DIR/${TARGET_NAME}.txt" "$SESSIONS_DIR/last"
-        rm -f "$SESSIONS_DIR"/tmux_resurrect_*.txt
-    fi
+        mkdir -p "$SESSIONS_DIR"
+
+        tmux run-shell -t "$TARGET_NAME" "$RESURRECT_SCRIPT" >/dev/null 2>&1
+
+        if [ -f "$SESSIONS_DIR/last" ] || [ -L "$SESSIONS_DIR/last" ]; then
+            cp -L "$SESSIONS_DIR/last" "$SESSIONS_DIR/${TARGET_NAME}.txt"
+            ln -sf "$SESSIONS_DIR/${TARGET_NAME}.txt" "$SESSIONS_DIR/last"
+            rm -f "$SESSIONS_DIR"/tmux_resurrect_*.txt
+        fi
+
+    ) 200>"$TMUX_SESSIONS_DIR/.save.lock"
 }
 
 do_create() {
@@ -129,29 +134,50 @@ do_create() {
 
 do_delete() {
     local TARGET="$1"
-    
+
     if [ -z "$TARGET" ]; then
         echo "Error: No session name provided."
         echo "Usage: $0 delete <session_name>"
         return 1
     fi
 
-    local TMUX_FILE="$TMUX_SESSIONS_DIR/${TARGET}.txt"
     local DELETED=0
+    local TMUX_FILE="$TMUX_SESSIONS_DIR/${TARGET}.txt"
+    local NVIM_SESSIONS_DIR="$HOME/.local/state/nvim/sessions"
 
+    # Delete tmux resurrect save
     if [ -f "$TMUX_FILE" ]; then
-        rm "$TMUX_FILE"
-        echo "Deleted Tmux file: $TARGET.txt"
+        rm -f "$TMUX_FILE"
+        echo "Deleted Tmux save: ${TARGET}.txt"
         DELETED=1
     fi
 
-   local NVIM_SESSIONS_DIR="$HOME/.local/state/nvim/sessions"
+    # Delete associated Neovim sessions
     if [ -d "$NVIM_SESSIONS_DIR" ]; then
-        find "$NVIM_SESSIONS_DIR" -type f -name "${TARGET}_*" -delete
+        while IFS= read -r file; do
+            rm -f "$file"
+            echo "Deleted Neovim session: $(basename "$file")"
+            DELETED=1
+        done < <(
+            find "$NVIM_SESSIONS_DIR" -type f \
+                \( \
+                    -name "${TARGET}_[0-9]*_[0-9]*" \
+                    -o -name "${TARGET}_[0-9]*_[0-9]*__*" \
+                \)
+        )
     fi
-    # -----------------------------------------
 
-    tmux kill-session -t "$TARGET" 2>/dev/null
+    if tmux has-session -t "$TARGET" 2>/dev/null; then
+        tmux kill-session -t "$TARGET"
+        echo "Killed running tmux session: $TARGET"
+        DELETED=1
+    fi
+
+    if [ "$DELETED" -eq 0 ]; then
+        echo "No project named '$TARGET' found."
+        return 1
+    fi
+
     echo "Deleted project '$TARGET'."
 }
 

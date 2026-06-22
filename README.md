@@ -1,39 +1,100 @@
 # Panekeeper
 
-> A robust, background-driven workspace orchestrator that bridges the gap between Tmux and Neovim.
+> Save and restore your entire Tmux + Neovim workspace with a single command.
 
-If you use Tmux and Neovim, you've probably encountered the same problem: Tmux can restore windows and pane layouts, but Neovim reopens with none of your buffers, cursor positions, or editing context.
+If you use Tmux and Neovim together, you've probably encountered the same problem:
 
-**Panekeeper** solves this by keeping your Tmux layout and Neovim state synchronized. Save, restore, and manage entire development environments without losing your workspace.
+* Tmux restores windows and pane layouts.
+* Neovim starts with no buffers open.
+* Cursor positions are lost.
+* Editing context disappears.
+
+After a reboot, crash, or accidental terminal closure, rebuilding your workspace becomes a manual process.
+
+**Panekeeper** bridges the gap between Tmux and Neovim by treating your entire development environment as a single workspace.
+
+When a project is restored, Panekeeper:
+
+* Restores the Tmux session layout.
+* Locates every pane running Neovim.
+* Restores the correct Neovim session for each pane.
+* Restores buffers, folds, cursor positions, and editing context.
+* Automatically isolates Neovim state per Git branch.
+
+The result is a workflow where you can stop working, reboot your machine, and continue exactly where you left off.
+
+---
+
+## Demo
+
 
 ---
 
 ## Features
 
-* Restore complete Tmux workspaces
-* Restore Neovim buffers, folds, and cursor positions
-* Git branch-aware Neovim sessions (automatically isolates state per branch)
-* Automatic background snapshots
+* Full Tmux workspace restoration
 * Pane-aware Neovim session management
-* Project-based workspace organization
-* Fast FZF-powered project launcher
+* Git branch-aware Neovim sessions
+* Automatic workspace snapshots
 * Crash and reboot recovery
-* Lightweight, decoupled architecture
+* Project-based workspace organization
+* FZF-powered project launcher
+* Lightweight shell-based architecture
+* Decoupled design built on existing tools
+* No database required
 
 ---
 
-When a project is loaded, Panekeeper:
+## How It Works
 
-1. Restores the Tmux layout.
-2. Locates panes running Neovim.
-3. Injects pane-specific restore commands.
-4. Rehydrates the exact Neovim state for each pane.
+```text
+Project
+    │
+    ▼
+Panekeeper
+    │
+    ├── tmux-resurrect
+    │       restores layouts
+    │
+    └── mini.sessions
+            restores Neovim state
+```
 
-### Auto-Save Daemon
+Panekeeper acts as the bridge between Tmux and Neovim, ensuring both are restored together.
 
-A silent background process periodically snapshots the entire workspace.
+---
 
-This ensures that unexpected crashes, reboots, or terminal closures do not result in lost work.
+## Restore Flow
+
+```text
+Load Project
+    │
+    ▼
+Restore Tmux Layout
+    │
+    ▼
+Locate Neovim Panes
+    │
+    ▼
+Inject Restore Commands
+    │
+    ▼
+Restore Pane-Specific Sessions
+```
+
+Every Neovim instance restores its own session based on:
+
+```text
+tmux_session_window_pane
+```
+
+and, when applicable:
+
+```text
+tmux_session_window_pane__git_branch
+```
+
+This allows different Git branches to maintain independent editor state.
 
 ---
 
@@ -41,15 +102,26 @@ This ensures that unexpected crashes, reboots, or terminal closures do not resul
 
 ## 1. Clone the Repository
 
-Clone Panekeeper into your configuration directory:
+```bash
+git clone https://github.com/Rimkomatic/panekeeper.git
+```
+
+It is recommended to place Panekeeper inside:
+
+```text
+~/.config/panekeeper
+```
+
+Example:
 
 ```bash
-git clone https://github.com/Rimkomatic/panekeeper.git 
-
+git clone https://github.com/Rimkomatic/panekeeper.git \
+    ~/.config/panekeeper
 ```
-It is recomemded to extract the files in ~/.config/panekeeper
 
-### Directory Structure
+---
+
+## Directory Structure
 
 ```text
 panekeeper/
@@ -64,20 +136,26 @@ panekeeper/
 └── README.md
 ```
 
-
+---
 
 ## Requirements
 
+### Core
+
 * Tmux
 * Neovim
+* Bash
 * fzf
-* bash
 
-Needed Neovim plugins
+### Neovim Plugins
 
-* `echasnovski/mini.sessions`
+```lua
+echasnovski/mini.sessions
+```
 
-Make the scripts executable:
+---
+
+## Make Scripts Executable
 
 ```bash
 chmod +x ~/.config/panekeeper/bin/*.sh
@@ -87,93 +165,93 @@ chmod +x ~/.config/panekeeper/fzf-launcher.sh
 
 ---
 
-## 2. Configure Tmux
+# Tmux Configuration
 
 Add the following to your `~/.tmux.conf`:
 
 ```tmux
 set -g @resurrect-dir '~/.project-sessions/'
 
-# Save the current project manually
 bind-key W run-shell -b "~/.config/panekeeper/bin/manage-project.sh save '#S'"
 
-# Start the auto-save daemon
 run-shell -b "~/.config/panekeeper/bin/auto-save.sh"
-
 ```
 
-### status bar indicator
+---
 
+## Status Bar Indicator
+
+Add this to your status line:
+
+```tmux
+#{?@is_saving,󰒓 ,}
 ```
 
- #S #{?@is_saving,󰒓 ,}\
+Example:
 
+```tmux
+set -g status-left "#S #{?@is_saving,󰒓 ,}"
 ```
 
-Example config
+---
 
-``` tmux
+## Full Example
+
+```tmux
 # ==========================================
 # Panekeeper Integration
 # ==========================================
 
-# 1. Start the background auto-save daemon (e.g., every 10 minutes)
+# Auto-save every 10 minutes
 run-shell -b "~/.config/panekeeper/bin/auto-save.sh 10"
 
-# 2. Manual Save Shortcut (Prefix + W)
-# Passes '#S' so the background daemon knows exactly which session to save
+# Manual Save
 bind-key W run-shell -b "~/.config/panekeeper/bin/manage-project.sh save '#S'"
 
-# 3. Launch the FZF Project Manager (Prefix + P)
-# Opens the launcher in a clean, floating Tmux popup
+# Project Launcher
 bind-key P display-popup -E "~/.config/panekeeper/fzf-launcher.sh"
 
 # ==========================================
 # Optional Settings
 # ==========================================
 
-# Change the default save location (Panekeeper defaults to ~/.project-sessions)
+# Custom save directory
 # set -g @resurrect-dir '~/.custom-save-folder/'
 
-# Add a visual indicator to your status bar when an auto-save occurs.
-# Drop this variable into your existing status-left or status-right string:
+# Status bar indicator
 # #{?@is_saving,󰒓 ,}
-
 ```
-
 
 ---
 
-## 3. Configure Neovim
+# Neovim Configuration
 
-Install the Panekeeper Lua module:
+Copy the Lua bridge:
 
 ```bash
 cp ~/.config/panekeeper/neovim/panekeeper.lua \
    ~/.config/nvim/lua/panekeeper.lua
 ```
 
-Then add the following to your `init.lua`:
+Add to your `init.lua`:
 
 ```lua
 require("panekeeper").setup()
-
 ```
 
-Your mini session config should look like this 
+---
 
-``` lua
+## mini.sessions Configuration
+
+```lua
 return {
     {
         "echasnovski/mini.nvim",
         version = false,
 
-        -- Ensure the plugin loads when Panekeeper sends the restore command
         cmd = { "TmuxSessionLoad" },
 
         config = function()
-            -- 1. Initialize mini.sessions
-            -- We disable auto-read/write because Panekeeper manages the state
             require("mini.sessions").setup({
                 autoread = false,
                 autowrite = false,
@@ -181,28 +259,37 @@ return {
                 file = "",
             })
 
-            -- 2. Initialize the Panekeeper bridge
             require("panekeeper").setup()
         end,
     },
 }
-
-```
-
-
-
-## 4. Configure according to preference 
-
-We can set different time for the autosave function to run , by default it is 6.9 minutes (noice) and we can pass arguments in our `tmux.conf` file in order to get different run time.
-
-```
-# To run each 3 minutes 
-
-run-shell -b "~/.config/panekeeper/bin/auto-save.sh 3"
-
 ```
 
 ---
+
+# Auto-Save Configuration
+
+By default:
+
+```text
+1 minute
+```
+
+Custom interval:
+
+```tmux
+run-shell -b "~/.config/panekeeper/bin/auto-save.sh 5"
+```
+
+This runs a snapshot every:
+
+```text
+5 minutes
+```
+
+---
+
+# Project Management
 
 ## Load Project
 
@@ -210,25 +297,27 @@ Displays all saved workspaces.
 
 Selecting a project will:
 
-* Attach to an existing background session if running
-* Otherwise rebuild the workspace from disk
-* Restore associated Neovim sessions automatically
+* Attach to an existing session if already running.
+* Restore from disk if not running.
+* Restore all associated Neovim sessions.
 
 ---
 
-## New Project
+## Create Project
 
 Creates a new isolated workspace.
 
 You will be prompted for:
 
-* Project name
+```text
+Project Name
+```
 
 Panekeeper then:
 
 1. Creates a new Tmux session.
-2. Attaches you to it immediately.
-3. Begins automatic background snapshots.
+2. Attaches you immediately.
+3. Starts automatic snapshotting.
 
 ---
 
@@ -239,14 +328,14 @@ Removes a project permanently.
 Deleted items include:
 
 * Saved Tmux layouts
-* Neovim session data
+* Neovim session files
 * Workspace metadata
 
 Use with caution.
 
 ---
 
-# Manual Saving
+# Manual Save
 
 Although the auto-save daemon continuously protects your workspace, you can create an immediate snapshot at any time:
 
@@ -258,7 +347,7 @@ Prefix + W
 
 # GUI Launchers
 
-Example launcher configurations are included for:
+Example launchers are included for:
 
 * Rofi
 * Walker
@@ -270,15 +359,39 @@ See the `gui_examples/` directory for setup instructions.
 
 # Why Panekeeper?
 
-Most workspace tools restore terminal layouts or editor sessions independently.
+Most workspace tools restore either:
 
-Panekeeper treats your entire development environment as a single unit:
+* Terminal layouts
+* Editor sessions
 
-* Tmux panes know which Neovim session belongs to them.
-* Neovim sessions know which project they belong to.
-* Automatic snapshots keep everything synchronized.
+Panekeeper restores both.
 
-The result is a workflow where you can stop working, reboot, and resume exactly where you left off.
+```text
+Tmux panes
+        │
+        ▼
+Neovim sessions
+        │
+        ▼
+Complete workspace recovery
+```
+
+By making Tmux and Neovim aware of each other, Panekeeper provides a workflow where:
+
+* Reboots are painless.
+* Crashes are recoverable.
+* Context switching is instant.
+* Development environments become portable.
+
+---
+
+# Acknowledgements
+
+Panekeeper builds upon the excellent work of:
+
+* tmux-resurrect
+* mini.sessions
+* fzf
 
 ---
 
